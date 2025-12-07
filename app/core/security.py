@@ -6,10 +6,14 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+import os
+from dotenv import load_dotenv
 
-SECRET_KEY = "your-secret-key-here-change-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
@@ -69,3 +73,25 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def get_current_umkm(
+    current_user = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the UMKM associated with the currently authenticated user.
+    Automatically retrieves the UMKM based on the logged-in user.
+    """
+    from app.models.umkm import UMKM
+
+    # Get UMKM owned by current user
+    umkm = db.query(UMKM).filter(UMKM.owner_id == current_user.id).first()
+
+    if not umkm:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="UMKM tidak ditemukan. Silakan daftarkan UMKM Anda terlebih dahulu.",
+        )
+
+    return umkm

@@ -4,16 +4,20 @@ from sqlalchemy import func, desc
 from typing import Optional, List
 from datetime import datetime, timedelta
 from app.core.database import get_db
+from app.core.security import get_current_umkm
 from app.models.transaction import Transaction, TransactionItem
 from app.models.product import Product
 from app.models.customer import Customer
+from app.models.umkm import UMKM
 from app.schemas.analytics import (
     SalesReportResponse,
     TopProductResponse,
     PaymentMethodStats,
     DailySalesResponse,
     MonthlyReportResponse,
-    DashboardResponse
+    DashboardResponse,
+    AIInsightsResponse,
+    BusinessHealthScoreResponse
 )
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics & Reports"])
@@ -314,3 +318,65 @@ async def get_payment_method_stats(
             percentage=round((float(p.amount or 0) / total_amount * 100) if total_amount > 0 else 0, 2)
         ) for p in payment_stats
     ]
+
+
+@router.get("/ai-insights", response_model=AIInsightsResponse)
+async def get_ai_insights(
+    days: int = Query(30, ge=1, le=365, description="Periode analisis dalam hari"),
+    current_umkm: UMKM = Depends(get_current_umkm),
+    db: Session = Depends(get_db)
+):
+    """
+    AI-powered business insights dengan analisis trends, recommendations, dan predictions
+
+    **Requires Authentication**: Bearer token (login terlebih dahulu)
+
+    Endpoint ini menggunakan AI untuk menganalisis data bisnis UMKM Anda dan memberikan:
+    - Summary: Ringkasan performa bisnis
+    - Trends: 3-5 trend penting yang teridentifikasi
+    - Recommendations: 3-5 rekomendasi actionable untuk meningkatkan bisnis
+    - Predictions: Estimasi performa bulan depan dengan confidence level
+
+    Data yang dianalisis otomatis berdasarkan UMKM yang sedang login.
+    """
+    from agent.analitik_agent import analyze_business_patterns
+
+    insights = analyze_business_patterns(umkm_id=current_umkm.id, db=db, days=days)
+
+    return AIInsightsResponse(
+        summary=insights['summary'],
+        trends=insights['trends'],
+        recommendations=insights['recommendations'],
+        predictions=insights['predictions']
+    )
+
+
+@router.get("/business-health", response_model=BusinessHealthScoreResponse)
+async def get_business_health(
+    current_umkm: UMKM = Depends(get_current_umkm),
+    db: Session = Depends(get_db)
+):
+    """
+    Business health score berdasarkan multiple metrics
+
+    **Requires Authentication**: Bearer token (login terlebih dahulu)
+
+    Menghitung skor kesehatan bisnis UMKM Anda (0-100) berdasarkan:
+    - Revenue Growth (25 points): Pertumbuhan revenue dibanding periode sebelumnya
+    - Transaction Consistency (25 points): Konsistensi penjualan harian
+    - Product Diversification (25 points): Jumlah produk aktif yang terjual
+    - Customer Base (25 points): Jumlah customer aktif
+
+    Data yang dianalisis otomatis berdasarkan UMKM yang sedang login.
+    """
+    from agent.analitik_agent import get_business_health_score
+
+    health_score = get_business_health_score(umkm_id=current_umkm.id, db=db)
+
+    return BusinessHealthScoreResponse(
+        total_score=health_score['total_score'],
+        status=health_score['status'],
+        message=health_score['message'],
+        breakdown=health_score['breakdown'],
+        max_score=health_score['max_score']
+    )

@@ -53,3 +53,24 @@ class DashboardResponse(BaseModel):
     top_products: List[TopProductResponse]
     payment_methods: List[PaymentMethodStats]
     daily_sales: List[DailySalesResponse]
+
+
+class PredictionResponse(BaseModel):
+    next_month_revenue_estimate: Optional[float] = None
+    next_month_transaction_estimate: Optional[int] = None
+    confidence: str
+
+
+class AIInsightsResponse(BaseModel):
+    summary: str
+    trends: List[str]
+    recommendations: List[str]
+    predictions: PredictionResponse
+
+
+class BusinessHealthScoreResponse(BaseModel):
+    total_score: int
+    status: str
+    message: str
+    breakdown: dict
+    max_score: int

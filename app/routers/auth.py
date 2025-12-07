@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from app.schemas.auth import LoginRequest, LoginResponse
+from app.schemas.auth import LoginRequest, LoginResponse, UserInfo
 from app.core.security import verify_password, create_access_token
 from app.core.database import get_db
 from app.models.user import User
+from app.models.umkm import UMKM
 
 router = APIRouter(prefix="/api/v1", tags=["Authentication"])
 
@@ -32,15 +33,20 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Get UMKM info if user has one
+    umkm = db.query(UMKM).filter(UMKM.owner_id == user.id).first()
+
     access_token = create_access_token(data={"sub": user.email, "role": user.role})
 
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
-        user={
-            "id": user.id,
-            "email": user.email,
-            "name": user.name,
-            "role": user.role
-        }
+        user=UserInfo(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+            umkm_id=umkm.id if umkm else None,
+            umkm_name=umkm.business_name if umkm else None
+        )
     )
