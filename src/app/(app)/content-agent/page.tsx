@@ -22,6 +22,15 @@ type ChatMessage = {
   created_at?: string;
 };
 
+type ContentHistoryRecord = {
+  role?: string;
+  message?: string;
+  user_input?: string;
+  assistant_output?: string;
+  created_at?: string;
+  timestamp?: string;
+};
+
 export default function ContentAgentPage() {
   const { token } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -35,17 +44,17 @@ export default function ContentAgentPage() {
     setInitialLoading(true);
     try {
       const historyResponse = await getContentHistory(token);
-      const records: any[] = Array.isArray(historyResponse)
+      const records: ContentHistoryRecord[] = Array.isArray(historyResponse)
         ? historyResponse
-        : Array.isArray((historyResponse as any)?.history)
-          ? (historyResponse as any).history
-          : Array.isArray((historyResponse as any)?.conversations)
-            ? (historyResponse as any).conversations
+        : Array.isArray((historyResponse as { history?: ContentHistoryRecord[] })?.history)
+          ? (historyResponse as { history?: ContentHistoryRecord[] }).history || []
+          : Array.isArray((historyResponse as { conversations?: ContentHistoryRecord[] })?.conversations)
+            ? (historyResponse as { conversations?: ContentHistoryRecord[] }).conversations || []
             : [];
 
       const flattened: ChatMessage[] = [];
 
-      records.forEach((item, idx) => {
+      records.forEach((item) => {
         const created = item?.created_at || item?.timestamp;
 
         if (item?.user_input || item?.assistant_output) {
@@ -94,10 +103,12 @@ export default function ContentAgentPage() {
     e.preventDefault();
     if (!token || !input.trim()) return;
     setLoading(true);
-    const newMessages = [
-      ...messages,
-      { role: "user", message: input, created_at: new Date().toISOString() },
-    ];
+    const userMessage: ChatMessage = {
+      role: "user",
+      message: input,
+      created_at: new Date().toISOString(),
+    };
+    const newMessages: ChatMessage[] = [...messages, userMessage];
     setMessages(newMessages);
     setInput("");
 
@@ -106,13 +117,14 @@ export default function ContentAgentPage() {
         message: input,
         image: file || undefined,
       });
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        message: response.reply ?? "",
+        created_at: new Date().toISOString(),
+      };
       setMessages([
         ...newMessages,
-        {
-          role: "assistant",
-          message: response.reply,
-          created_at: new Date().toISOString(),
-        },
+        assistantMessage,
       ]);
       setFile(null);
     } catch (err) {
@@ -183,8 +195,8 @@ export default function ContentAgentPage() {
             )}
             {!initialLoading && messages.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                No conversation yet. Start with a brief: "Buat caption Instagram
-                untuk promo akhir pekan."
+                No conversation yet. Start with a brief: &quot;Buat caption
+                Instagram untuk promo akhir pekan.&quot;
               </p>
             )}
             {messages.map((m, idx) => (

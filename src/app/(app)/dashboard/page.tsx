@@ -573,7 +573,7 @@ export default function DashboardPage() {
                           : "N/A"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Confidence {confidence(aiInsights.predictions.confidence as any)}
+                        Confidence {confidence(aiInsights.predictions.confidence)}
                       </p>
                     </div>
                   </div>

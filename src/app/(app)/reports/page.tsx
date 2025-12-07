@@ -32,13 +32,21 @@ const currency = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
+type SalesReportSummary = {
+  total_revenue?: number;
+  total_profit?: number;
+  transaction_count?: number;
+  average_order_value?: number;
+  [key: string]: unknown;
+};
+
 export default function ReportsPage() {
   const { token, user } = useAuth();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [months, setMonths] = useState(6);
   const [loading, setLoading] = useState(false);
-  const [salesReport, setSalesReport] = useState<Record<string, any> | null>(
+  const [salesReport, setSalesReport] = useState<SalesReportSummary | null>(
     null,
   );
   const [monthlyReport, setMonthlyReport] = useState<MonthlyReportResponse[]>([]);

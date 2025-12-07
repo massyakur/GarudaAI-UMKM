@@ -92,7 +92,6 @@ export default function TransactionsPage() {
     () => (user?.umkm_id as string) || "",
     [user?.umkm_id],
   );
-  const isAdmin = user?.role?.toLowerCase?.() === "admin";
 
   const fetchTransactions = async () => {
     if (!token) return;

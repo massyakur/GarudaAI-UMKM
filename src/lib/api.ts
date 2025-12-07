@@ -477,27 +477,29 @@ export const sendContentMessage = async (
   token: string,
   payload: { message: string; image?: File | Blob },
 ) => {
+  type ContentMessageResponse = { reply?: string; response?: string; thread_id?: string };
+
   if (payload.image) {
     const formData = new FormData();
     formData.append("message", payload.message);
     formData.append("image", payload.image);
-    return request<{ reply?: string; response?: string; thread_id?: string }>(
+    return request<ContentMessageResponse>(
       "/api/v1/content-agent/chat",
       { method: "POST", body: formData },
       token,
     ).then((res) => ({
-      reply: (res as any).reply || (res as any).response || "",
-      thread_id: (res as any).thread_id,
+      reply: res.reply ?? res.response ?? "",
+      thread_id: res.thread_id,
     }));
   }
 
-  return request<{ reply?: string; response?: string; thread_id?: string }>(
+  return request<ContentMessageResponse>(
     "/api/v1/content-agent/chat",
     { method: "POST", body: JSON.stringify({ message: payload.message }) },
     token,
   ).then((res) => ({
-    reply: (res as any).reply || (res as any).response || "",
-    thread_id: (res as any).thread_id,
+    reply: res.reply ?? res.response ?? "",
+    thread_id: res.thread_id,
   }));
 };
 
