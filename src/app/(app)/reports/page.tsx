@@ -230,7 +230,7 @@ export default function ReportsPage() {
                         {String(item.name || item.product_name || "Unnamed")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity_sold || item.total_sold || item.count || 0} units
+                        {(item.quantity_sold ?? item.total_sold ?? 0)} units
                       </p>
                     </div>
                   </div>
