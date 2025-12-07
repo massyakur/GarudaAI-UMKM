@@ -62,20 +62,23 @@ async def chat(
     """
     try:
         # Get user's UMKM data if exists
-        umkm = current_user.umkm
+        umkm_list = current_user.umkm_businesses
 
-        if not umkm:
+        if not umkm_list or len(umkm_list) == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User belum memiliki data UMKM. Silakan lengkapi profil bisnis terlebih dahulu."
             )
+
+        # Use the first UMKM if user has multiple businesses
+        umkm = umkm_list[0]
 
         # Call the agent
         response = chat_with_agent(
             user_id=str(current_user.id),
             user_name=current_user.name,
             business_name=umkm.business_name,
-            business_type=umkm.business_category,
+            business_type=umkm.business_type,
             message=request.message,
             image_base64=request.image_base64,
             image_mime_type=request.image_mime_type

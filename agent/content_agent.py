@@ -10,15 +10,14 @@ from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langchain.agents.middleware import dynamic_prompt, ModelRequest
 from langchain.tools import tool, ToolRuntime
 from langgraph.checkpoint.memory import InMemorySaver
-from dataclasses import dataclass
+from pydantic import BaseModel
 import sqlite3
 import uuid
 from pathlib import Path
 from jinja2 import Template
 from agent.prompt import CONTENT_CREATOR_PROMPT
 
-@dataclass
-class Context:
+class Context(BaseModel):
     user_id: str
     user_name: str
     business_name: str
@@ -254,7 +253,7 @@ def chat_with_agent(
     business_type: str,
     message: str,
     image_base64: str | None = None,
-    image_mime_type: str | None = None
+    image_mime_type: str | None = None 
 ) -> str:
     """
     Main function to chat with the content agent.
