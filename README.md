@@ -1,4 +1,4 @@
-[![CodeGuide](/codeguide-backdrop.svg)](https://codeguide.dev)
+[![NEVADA](/public/NEVADA_Logo.png)](https://github.com/massyakur/GarudaAI-UMKM)
 
 # NEVADA Frontend
 
@@ -59,7 +59,7 @@ src/
 
 ## Environment
 ```env
-NEXT_PUBLIC_API_URL=https://9812afe22a53.ngrok-free.app
+NEXT_PUBLIC_API_URL= $BackendUrl
 ```
 
 ## Notes
