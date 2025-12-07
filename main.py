@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, products, customers, transactions, analytics
+from app.routers import auth, products, customers, transactions, analytics, content_agent
 from app.core.database import engine, Base
 from app.models import User, UMKM, Product, Customer, Transaction, TransactionItem
 import uvicorn
@@ -28,6 +28,7 @@ app.include_router(products.router)
 app.include_router(customers.router)
 app.include_router(transactions.router)
 app.include_router(analytics.router)
+app.include_router(content_agent.router)
 
 
 @app.get("/")

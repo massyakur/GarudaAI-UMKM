@@ -8,3 +8,7 @@ sqlalchemy
 faker
 bcrypt==4.0.1
 pydantic[email]
+pydantic-settings
+langchain
+langchain-openai
+jinja2
