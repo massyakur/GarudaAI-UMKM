@@ -252,7 +252,9 @@ def chat_with_agent(
     user_name: str,
     business_name: str,
     business_type: str,
-    message: str
+    message: str,
+    image_base64: str | None = None,
+    image_mime_type: str | None = None
 ) -> str:
     """
     Main function to chat with the content agent.
@@ -263,6 +265,8 @@ def chat_with_agent(
         business_name: Name of the business
         business_type: Type of the business
         message: User's message/question
+        image_base64: Optional base64-encoded image data
+        image_mime_type: Optional MIME type of the image (e.g., "image/jpeg", "image/png")
 
     Returns:
         str: Agent's response
@@ -281,8 +285,19 @@ def chat_with_agent(
         business_type=business_type
     )
 
+    # Create input content
+    content = [{"type": "text", "text": message}]
+
+    # Add image if provided
+    if image_base64 and image_mime_type:
+        content.append({
+            "type": "image",
+            "base64": image_base64,
+            "mime_type": image_mime_type
+        })
+
     # Create input messages
-    input_messages = [HumanMessage(content=message)]
+    input_messages = [HumanMessage(content=content)]
 
     # Invoke agent
     result = agent.invoke(

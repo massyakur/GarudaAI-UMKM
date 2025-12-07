@@ -18,6 +18,8 @@ router = APIRouter(prefix="/api/v1/content-agent", tags=["Content Agent"])
 # Schemas
 class ChatRequest(BaseModel):
     message: str
+    image_base64: Optional[str] = None
+    image_mime_type: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -52,6 +54,11 @@ async def chat(
     """
     Chat with the content agent.
     Agent will generate copywriting and content scripts for your business.
+
+    Supports multi-modal input:
+    - message: Text message (required)
+    - image_base64: Base64-encoded image data (optional)
+    - image_mime_type: MIME type of the image, e.g., "image/jpeg", "image/png" (optional)
     """
     try:
         # Get user's UMKM data if exists
@@ -69,7 +76,9 @@ async def chat(
             user_name=current_user.name,
             business_name=umkm.business_name,
             business_type=umkm.business_category,
-            message=request.message
+            message=request.message,
+            image_base64=request.image_base64,
+            image_mime_type=request.image_mime_type
         )
 
         # Get thread_id for response
