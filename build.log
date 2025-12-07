@@ -1,0 +1,41 @@
+
+> codeguide-starter-kit-lite-v2@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.7
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 10.1s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/12) ...
+   Generating static pages (3/12) 
+   Generating static pages (6/12) 
+   Generating static pages (9/12) 
+ ✓ Generating static pages (12/12)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    2.68 kB         153 kB
+├ ○ /_not-found                            997 B         103 kB
+├ ○ /content-agent                        5.2 kB         126 kB
+├ ○ /customers                           3.17 kB         139 kB
+├ ○ /dashboard                            112 kB         233 kB
+├ ○ /login                               5.24 kB         125 kB
+├ ○ /products                            3.42 kB         140 kB
+├ ○ /reports                             2.88 kB         127 kB
+└ ○ /transactions                        4.12 kB         140 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/255-ac576b8c1dfdf619.js       45.5 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js  54.2 kB
+  └ other shared chunks (total)          1.99 kB
+
+
+○  (Static)  prerendered as static content
+
