@@ -10,7 +10,18 @@ import {
   Users,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboard, type DashboardData } from "@/lib/api";
+import {
+  getAIInsights,
+  getBusinessHealth,
+  getDashboard,
+  getTopProducts,
+  getPaymentMethods,
+  type AIInsightsResponse,
+  type BusinessHealthResponse,
+  type DashboardData,
+  type TopProductResponse,
+  type PaymentMethodStats,
+} from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +48,23 @@ const currency = new Intl.NumberFormat("id-ID", {
 });
 
 const percent = (value?: number) =>
-  value !== undefined ? `${value.toFixed(1)}%` : "—";
+  typeof value === "number" && !Number.isNaN(value)
+    ? `${value.toFixed(1)}%`
+    : "N/A";
+
+const formatCurrencyOrNA = (value?: number | null) =>
+  value === null || value === undefined ? "N/A" : currency.format(value);
+
+const confidence = (value?: number | string) => {
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    const normalized = value <= 1 ? value * 100 : value;
+    return `${normalized.toFixed(0)}%`;
+  }
+  if (typeof value === "string") {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+  return "N/A";
+};
 
 type MetricCardProps = {
   title: string;
@@ -74,20 +101,70 @@ function MetricCard({ title, value, change, icon }: MetricCardProps) {
 export default function DashboardPage() {
   const { token, user } = useAuth();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [aiInsights, setAiInsights] = useState<AIInsightsResponse | null>(null);
+  const [businessHealth, setBusinessHealth] =
+    useState<BusinessHealthResponse | null>(null);
+  const [topProducts, setTopProducts] = useState<TopProductResponse[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodStats[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
   const [umkmId, setUmkmId] = useState<string>(
     (user?.umkm_id as string) || "",
   );
+  const isAdmin = user?.role?.toLowerCase?.() === "admin";
 
-  const fetchDashboard = async () => {
-    if (!token || !umkmId) return;
+  useEffect(() => {
+    if (!isAdmin && user?.umkm_id) {
+      setUmkmId(String(user.umkm_id));
+    }
+  }, [isAdmin, user?.umkm_id]);
+
+  const fetchAnalytics = async () => {
+    if (!token || !umkmId) {
+      return;
+    }
     setLoading(true);
     setError(null);
+    const daysParam =
+      Number.isFinite(days) && days > 0 ? Math.min(days, 365) : undefined;
     try {
-      const data = await getDashboard(token, umkmId, { days });
-      setDashboard(data);
+      const [
+        dashboardData,
+        insightsData,
+        healthData,
+        topProductsData,
+        paymentMethodsData,
+      ] = await Promise.all([
+        getDashboard(token, umkmId, { days: daysParam }),
+        getAIInsights(token, umkmId, { days: daysParam }),
+        getBusinessHealth(token, umkmId),
+        getTopProducts(token, umkmId, { limit: 10, days: daysParam }),
+        getPaymentMethods(token, umkmId, { days: daysParam }),
+      ]);
+      setDashboard(dashboardData);
+      setAiInsights(insightsData);
+      setBusinessHealth(healthData);
+      setTopProducts(
+        (topProductsData || []).map((item, idx) => ({
+          ...item,
+          total_sold: item.total_sold ?? item.quantity_sold,
+          total_revenue: item.total_revenue ?? item.revenue,
+          product_name: item.product_name || item.name,
+          product_id: item.product_id ?? item.product_name ?? idx,
+        })),
+      );
+      setPaymentMethods(
+        (paymentMethodsData || []).map((item, idx) => ({
+          ...item,
+          method: item.payment_method || item.method,
+          payment_method: item.payment_method || item.method,
+          total_amount: item.total_amount ?? 0,
+          count: item.count ?? 0,
+          percentage: item.percentage,
+          key: item.payment_method || item.method || idx,
+        })),
+      );
     } catch (err) {
       const message =
         err instanceof Error
@@ -101,9 +178,11 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchDashboard();
+    if (token && umkmId) {
+      fetchAnalytics();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, umkmId]);
 
   const salesData = useMemo(
     () =>
@@ -115,11 +194,32 @@ export default function DashboardPage() {
     [dashboard],
   );
 
-  const topProducts =
-    dashboard?.top_products?.map((item, idx) => ({
-      ...item,
-      rank: idx + 1,
-    })) || [];
+  const growthPercent =
+    dashboard?.revenue_growth ?? dashboard?.revenue_growth_percentage ?? 0;
+
+  const healthScore = Math.max(businessHealth?.total_score ?? 0, 0);
+  const maxHealthScore = businessHealth?.max_score || 100;
+  const healthScorePercent =
+    maxHealthScore > 0 ? Math.min((healthScore / maxHealthScore) * 100, 100) : 0;
+
+  const paymentMethodsToShow =
+    paymentMethods.length > 0
+      ? paymentMethods
+      : (dashboard?.payment_methods || []).map((pm, idx) => ({
+          method: pm.method,
+          payment_method: pm.method,
+          total_amount: pm.total_amount,
+          count: pm.count,
+          percentage: pm.percentage,
+          key: pm.method || idx,
+        }));
+
+  const healthBreakdown = [
+    { label: "Revenue growth", value: businessHealth?.breakdown?.revenue_growth },
+    { label: "Consistency", value: businessHealth?.breakdown?.consistency },
+    { label: "Diversification", value: businessHealth?.breakdown?.diversification },
+    { label: "Customer base", value: businessHealth?.breakdown?.customer_base },
+  ];
 
   return (
     <div className="space-y-6">
@@ -148,6 +248,7 @@ export default function DashboardPage() {
                   placeholder="Enter UMKM ID"
                   onChange={(e) => setUmkmId(e.target.value)}
                   className="w-40"
+                  disabled={!isAdmin}
                 />
               </div>
               <div className="space-y-1">
@@ -157,12 +258,13 @@ export default function DashboardPage() {
                 <Input
                   type="number"
                   min={1}
+                  max={365}
                   value={days}
                   onChange={(e) => setDays(Number(e.target.value))}
                   className="w-24"
                 />
               </div>
-              <Button onClick={fetchDashboard} disabled={!umkmId || loading}>
+              <Button onClick={fetchAnalytics} disabled={!umkmId || loading}>
                 {loading ? "Refreshing..." : "Refresh"}
               </Button>
             </div>
@@ -217,7 +319,7 @@ export default function DashboardPage() {
         <MetricCard
           title="Total revenue"
           value={currency.format(dashboard?.total_revenue || 0)}
-          change={percent(dashboard?.revenue_growth_percentage || 0)}
+          change={percent(growthPercent)}
           icon={<LineChartIcon className="h-4 w-4" />}
         />
         <MetricCard
@@ -297,19 +399,24 @@ export default function DashboardPage() {
             <CreditCard className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="space-y-2">
-            {dashboard?.payment_methods?.length ? (
-              dashboard.payment_methods.map((method) => (
+            {paymentMethodsToShow.length ? (
+              paymentMethodsToShow.map((method, idx) => (
                 <div
-                  key={method.method}
+                  key={`${method.payment_method || method.method || idx}`}
                   className="flex items-center justify-between rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {method.method}
+                      {method.payment_method || method.method || "Unknown"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {method.count || 0} payments
+                      {(method.count || 0).toLocaleString("id-ID")} payments
                     </p>
+                    {method.percentage !== undefined && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        {percent(method.percentage)} of mix
+                      </p>
+                    )}
                   </div>
                   <p className="text-sm font-mono text-slate-900 dark:text-white">
                     {currency.format(method.total_amount || 0)}
@@ -325,7 +432,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="p-4 border-white/70 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -340,26 +447,26 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2">
             {topProducts.length ? (
-              topProducts.map((product) => (
+              topProducts.map((product, idx) => (
                 <div
-                  key={product.name}
+                  key={product.product_id ?? product.product_name ?? idx}
                   className="flex items-center justify-between rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3"
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary" className="bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-                      #{product.rank}
+                      #{idx + 1}
                     </Badge>
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {product.name}
+                        {product.product_name || "Unnamed product"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {product.quantity_sold || 0} units sold
+                        {product.category || "Uncategorized"} · {product.total_sold || 0} units
                       </p>
                     </div>
                   </div>
                   <p className="text-sm font-mono text-slate-900 dark:text-white">
-                    {currency.format(product.revenue || 0)}
+                    {currency.format(product.total_revenue || 0)}
                   </p>
                 </div>
               ))
@@ -375,33 +482,206 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
-                Notes
+                AI insights
               </p>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Operating checklist
+                Signals & actions
               </h3>
             </div>
+            <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100">
+              AI
+            </Badge>
           </div>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>
-              • Keep UMKM ID consistent across product, customer, and
-              transaction creation.
-            </li>
-            <li>
-              • Sync receipts through the OCR modal on Transactions to reduce
-              manual entry.
-            </li>
-            <li>
-              • Use Reports for monthly summaries before sharing updates to
-              lenders.
-            </li>
-            <li>
-              • Try the Content Agent to draft promos or customer updates from
-              live numbers.
-            </li>
-          </ul>
+          {aiInsights ? (
+            <div className="space-y-3">
+              {aiInsights.summary && (
+                <p className="text-sm text-muted-foreground">
+                  {aiInsights.summary}
+                </p>
+              )}
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
+                  Trends
+                </p>
+                {aiInsights.trends?.length ? (
+                  <ul className="space-y-2">
+                    {aiInsights.trends.slice(0, 3).map((trend, idx) => (
+                      <li
+                        key={`trend-${idx}`}
+                        className="rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2 text-sm text-slate-900 dark:text-white"
+                      >
+                        {trend}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No trend signals yet.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
+                  Recommendations
+                </p>
+                {aiInsights.recommendations?.length ? (
+                  <ul className="space-y-2">
+                    {aiInsights.recommendations.slice(0, 3).map((rec, idx) => (
+                      <li
+                        key={`rec-${idx}`}
+                        className="rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-2 text-sm text-slate-900 dark:text-white"
+                      >
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No AI recommendations yet.
+                  </p>
+                )}
+              </div>
+              {aiInsights.predictions && (
+                <div className="rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
+                    Prediction
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {formatCurrencyOrNA(
+                          aiInsights.predictions.next_month_revenue_estimate,
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Projected revenue next month
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                        Transactions
+                      </p>
+                      <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        {aiInsights.predictions
+                          .next_month_transaction_estimate !== undefined &&
+                        aiInsights.predictions
+                          .next_month_transaction_estimate !== null
+                          ? Number(
+                              aiInsights.predictions
+                                .next_month_transaction_estimate,
+                            ).toLocaleString("id-ID")
+                          : "N/A"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Confidence {confidence(aiInsights.predictions.confidence as any)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Refresh to fetch AI insights for this UMKM.
+            </p>
+          )}
+        </Card>
+
+        <Card className="p-4 border-white/70 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
+                Business health
+              </p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Credit readiness
+              </h3>
+            </div>
+            <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100">
+              {businessHealth?.status || `${Math.round(healthScore)} / ${maxHealthScore}`}
+            </Badge>
+          </div>
+          {businessHealth ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3">
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                  Health score
+                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-3xl font-semibold text-slate-900 dark:text-white">
+                    {Math.round(healthScore)}
+                  </p>
+                  <div className="flex-1">
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-500 to-emerald-500"
+                        style={{ width: `${healthScorePercent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {businessHealth.status || "Calculating..."}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {healthBreakdown.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3"
+                  >
+                    <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                      {item.label}
+                    </p>
+                    <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                      {item.value ?? "N/A"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              {businessHealth.message && (
+                <p className="text-xs text-muted-foreground">
+                  {businessHealth.message}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Refresh to calculate business health score.
+            </p>
+          )}
         </Card>
       </div>
+
+      <Card className="p-4 border-white/70 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">
+              Notes
+            </p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Operating checklist
+            </h3>
+          </div>
+        </div>
+        <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-4">
+          <li>
+            Keep UMKM ID consistent across product, customer, and transaction
+            creation.
+          </li>
+          <li>
+            Sync receipts through the OCR modal on Transactions to reduce
+            manual entry.
+          </li>
+          <li>
+            Use Reports for monthly summaries before sharing updates to lenders.
+          </li>
+          <li>
+            Try the Content Agent to draft promos or customer updates from live
+            numbers.
+          </li>
+        </ul>
+      </Card>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import {
   getMonthlyReport,
   getSalesReport,
   getTopProducts,
+  type MonthlyReportResponse,
+  type TopProductResponse,
 } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
@@ -39,10 +41,8 @@ export default function ReportsPage() {
   const [salesReport, setSalesReport] = useState<Record<string, any> | null>(
     null,
   );
-  const [monthlyReport, setMonthlyReport] = useState<Array<Record<string, any>>>(
-    [],
-  );
-  const [topProducts, setTopProducts] = useState<Array<Record<string, any>>>([]);
+  const [monthlyReport, setMonthlyReport] = useState<MonthlyReportResponse[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProductResponse[]>([]);
 
   const umkmId = useMemo(
     () => (user?.umkm_id as string) || "",
@@ -52,18 +52,27 @@ export default function ReportsPage() {
   const fetchReports = async () => {
     if (!token || !umkmId) return;
     setLoading(true);
+    const monthsParam =
+      Number.isFinite(months) && months > 0 ? Math.min(months, 12) : 6;
     try {
       const [sales, monthly, top] = await Promise.all([
         getSalesReport(token, umkmId, {
           start_date: startDate || undefined,
           end_date: endDate || undefined,
         }),
-        getMonthlyReport(token, umkmId, { months }),
+        getMonthlyReport(token, umkmId, { months: monthsParam }),
         getTopProducts(token, umkmId, { limit: 5 }),
       ]);
       setSalesReport(sales);
-      setMonthlyReport(monthly);
-      setTopProducts(top);
+      setMonthlyReport(monthly || []);
+      setTopProducts(
+        (top || []).map((item) => ({
+          ...item,
+          quantity_sold: item.quantity_sold ?? item.total_sold,
+          revenue: item.revenue ?? item.total_revenue,
+          name: item.name || item.product_name,
+        })),
+      );
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -118,6 +127,7 @@ export default function ReportsPage() {
               <Input
                 type="number"
                 min={1}
+                max={12}
                 value={months}
                 onChange={(e) => setMonths(Number(e.target.value))}
                 className="w-28"
@@ -202,22 +212,22 @@ export default function ReportsPage() {
             {topProducts.length ? (
               topProducts.map((item, idx) => (
                 <div
-                  key={`${item.name}-${idx}`}
+                  key={`${item.name || item.product_name || "item"}-${idx}`}
                   className="flex items-center justify-between rounded-lg border border-white/60 dark:border-white/10 bg-white/60 dark:bg-white/5 p-3"
                 >
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">#{idx + 1}</Badge>
                     <div>
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {String(item.name || "Unnamed")}
+                        {String(item.name || item.product_name || "Unnamed")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.quantity_sold || item.count || 0} units
+                        {item.quantity_sold || item.total_sold || item.count || 0} units
                       </p>
                     </div>
                   </div>
                   <p className="text-sm font-mono text-slate-900 dark:text-white">
-                    {currency.format(Number(item.revenue || 0))}
+                    {currency.format(Number(item.revenue || item.total_revenue || 0))}
                   </p>
                 </div>
               ))
@@ -252,7 +262,7 @@ export default function ReportsPage() {
           <TableBody>
             {monthlyReport.map((month) => (
               <TableRow key={month.month}>
-                <TableCell>{month.month || month.label || "—"}</TableCell>
+                <TableCell>{month.month || "—"}</TableCell>
                 <TableCell>
                   {currency.format(Number(month.revenue || 0))}
                 </TableCell>
@@ -260,7 +270,7 @@ export default function ReportsPage() {
                   {currency.format(Number(month.profit || 0))}
                 </TableCell>
                 <TableCell>
-                  {(Number(month.transactions || month.transaction_count || 0)).toLocaleString(
+                  {(Number(month.transaction_count || 0)).toLocaleString(
                     "id-ID",
                   )}
                 </TableCell>

@@ -92,6 +92,7 @@ export default function TransactionsPage() {
     () => (user?.umkm_id as string) || "",
     [user?.umkm_id],
   );
+  const isAdmin = user?.role?.toLowerCase?.() === "admin";
 
   const fetchTransactions = async () => {
     if (!token) return;
@@ -103,7 +104,19 @@ export default function TransactionsPage() {
         start_date: filters.start_date || undefined,
         end_date: filters.end_date || undefined,
       });
-      setTransactions(data);
+      const normalized = (data || []).map((tx) => {
+        const normalizedAmount =
+          Number(
+            tx.final_amount ?? tx.total_amount ?? tx.amount ?? 0,
+          ) || 0;
+        return {
+          ...tx,
+          amount: normalizedAmount,
+          final_amount: tx.final_amount ?? normalizedAmount,
+          total_amount: tx.total_amount ?? normalizedAmount,
+        };
+      });
+      setTransactions(normalized);
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -116,9 +129,11 @@ export default function TransactionsPage() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    if (token) {
+      fetchTransactions();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, umkmId]);
 
   const resetForm = () => {
     setForm({
@@ -134,8 +149,12 @@ export default function TransactionsPage() {
 
   const openForEdit = (transaction: Transaction) => {
     setEditingId(transaction.id || null);
+    const normalizedAmount =
+      Number(
+        transaction.final_amount ?? transaction.total_amount ?? transaction.amount ?? 0,
+      ) || 0;
     setForm({
-      amount: transaction.amount,
+      amount: normalizedAmount,
       payment_status: transaction.payment_status,
       payment_method: transaction.payment_method,
       transaction_date: transaction.transaction_date,
@@ -152,6 +171,8 @@ export default function TransactionsPage() {
     const payload: Transaction = {
       ...form,
       umkm_id: umkmId || undefined,
+      total_amount: form.amount,
+      final_amount: form.amount,
     };
 
     try {
@@ -279,7 +300,10 @@ export default function TransactionsPage() {
                       type="number"
                       value={form.amount}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, amount: Number(e.target.value) }))
+                        setForm((f) => ({
+                          ...f,
+                          amount: Number(e.target.value) || 0,
+                        }))
                       }
                       placeholder="100000"
                     />
@@ -432,68 +456,72 @@ export default function TransactionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactions.map((tx) => (
-              <TableRow key={tx.id}>
-                <TableCell>{tx.transaction_date || "—"}</TableCell>
-                <TableCell>{currency.format(tx.amount)}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      tx.payment_status === "paid" ? "default" : "secondary"
-                    }
-                    className={
-                      tx.payment_status === "paid"
-                        ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100"
-                        : "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
-                    }
-                  >
-                    {tx.payment_status || "n/a"}
-                  </Badge>
-                </TableCell>
-                <TableCell>{tx.payment_method || "-"}</TableCell>
-                <TableCell className="max-w-xs truncate">
-                  {tx.description || "-"}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openForEdit(tx)}
+            {transactions.map((tx) => {
+              const displayAmount =
+                Number(tx.final_amount ?? tx.total_amount ?? tx.amount ?? 0) || 0;
+              return (
+                <TableRow key={tx.id}>
+                  <TableCell>{tx.transaction_date || "—"}</TableCell>
+                  <TableCell>{currency.format(displayAmount)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        tx.payment_status === "paid" ? "default" : "secondary"
+                      }
+                      className={
+                        tx.payment_status === "paid"
+                          ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100"
+                          : "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+                      }
                     >
-                      Edit
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="h-8 w-8"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This removes the record via FastAPI.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => tx.id && handleDelete(tx.id)}
+                      {tx.payment_status || "n/a"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{tx.payment_method || "-"}</TableCell>
+                  <TableCell className="max-w-xs truncate">
+                    {tx.description || "-"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openForEdit(tx)}
+                      >
+                        Edit
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-8 w-8"
                           >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This removes the record via FastAPI.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => tx.id && handleDelete(tx.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         {!transactions.length && !loading && (

@@ -77,6 +77,7 @@ export type User = {
   name?: string;
   umkm_id?: string;
   role?: string;
+  umkm_name?: string;
 };
 
 export type LoginResponse = {
@@ -141,6 +142,7 @@ export type DashboardData = {
   total_transactions?: number;
   total_customers?: number;
   total_products?: number;
+  revenue_growth?: number;
   revenue_growth_percentage?: number;
   pending_transactions?: number;
   top_products?: Array<{
@@ -152,12 +154,64 @@ export type DashboardData = {
     method?: string;
     count?: number;
     total_amount?: number;
+    percentage?: number;
   }>;
   daily_sales?: Array<{
     date: string;
     revenue?: number;
     transactions?: number;
   }>;
+};
+
+export type TopProductResponse = {
+  product_id?: number | string;
+  product_name?: string;
+  category?: string;
+  total_sold?: number;
+  total_revenue?: number;
+  name?: string;
+  quantity_sold?: number;
+  revenue?: number;
+};
+
+export type AIInsightsResponse = {
+  summary?: string;
+  trends?: string[];
+  recommendations?: string[];
+  predictions?: {
+    next_month_revenue_estimate?: number | null;
+    next_month_transaction_estimate?: number | null;
+    confidence?: string | number;
+  };
+};
+
+export type BusinessHealthResponse = {
+  total_score?: number;
+  status?: string;
+  message?: string;
+  breakdown?: {
+    revenue_growth?: number;
+    consistency?: number;
+    diversification?: number;
+    customer_base?: number;
+  };
+  max_score?: number;
+};
+
+export type PaymentMethodStats = {
+  payment_method?: string;
+  method?: string;
+  count?: number;
+  total_amount?: number;
+  percentage?: number;
+};
+
+export type MonthlyReportResponse = {
+  month?: string;
+  revenue?: number;
+  transaction_count?: number;
+  profit?: number;
+  top_product?: string | null;
 };
 
 // Authentication
@@ -336,7 +390,7 @@ export const getTopProducts = (
   umkmId: string | number,
   params?: { limit?: number; days?: number },
 ) =>
-  request<Array<Record<string, unknown>>>(
+  request<Array<TopProductResponse>>(
     `/api/v1/analytics/top-products${buildQueryString({
       umkm_id: umkmId,
       ...params,
@@ -350,7 +404,7 @@ export const getMonthlyReport = (
   umkmId: string | number,
   params?: { months?: number },
 ) =>
-  request<Array<Record<string, unknown>>>(
+  request<Array<MonthlyReportResponse>>(
     `/api/v1/analytics/monthly-report${buildQueryString({
       umkm_id: umkmId,
       ...params,
@@ -364,10 +418,33 @@ export const getPaymentMethods = (
   umkmId: string | number,
   params?: { days?: number },
 ) =>
-  request<Array<Record<string, unknown>>>(
+  request<Array<PaymentMethodStats>>(
     `/api/v1/analytics/payment-methods${buildQueryString({
       umkm_id: umkmId,
       ...params,
+    })}`,
+    { method: "GET" },
+    token,
+  );
+
+export const getAIInsights = (
+  token: string,
+  umkmId: string | number,
+  params?: { days?: number },
+) =>
+  request<AIInsightsResponse>(
+    `/api/v1/analytics/ai-insights${buildQueryString({
+      umkm_id: umkmId,
+      ...params,
+    })}`,
+    { method: "GET" },
+    token,
+  );
+
+export const getBusinessHealth = (token: string, umkmId: string | number) =>
+  request<BusinessHealthResponse>(
+    `/api/v1/analytics/business-health${buildQueryString({
+      umkm_id: umkmId,
     })}`,
     { method: "GET" },
     token,
