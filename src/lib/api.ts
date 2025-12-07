@@ -113,9 +113,14 @@ export type Customer = {
 export type Transaction = {
   id?: string | number;
   amount: number;
+  total_amount?: number;
+  final_amount?: number;
   transaction_type?: string;
   payment_status?: string;
   payment_method?: string;
+  discount_amount?: number;
+  tax_amount?: number;
+  transaction_number?: string;
   description?: string;
   customer_id?: string | number;
   product_id?: string | number;
